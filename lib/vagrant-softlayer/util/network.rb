@@ -37,7 +37,16 @@ module VagrantPlugins
           data_type = env[:machine].provider_config.private_only ? "primaryBackendNetworkComponent" : "primaryNetworkComponent"
           data_type = "primaryBackendNetworkComponent" if env[:machine].provider_config.force_private_ip
           mask      = "#{data_type}.primaryIpAddressRecord.id,#{data_type}.primaryIpAddressRecord.ipAddress"
-          record    = sl_warden { env[:sl_machine].object_mask("mask[#{mask}]").getObject }
+          record    = {}
+
+          startTime = Time.new
+          timeout   = env[:machine].provider_config.provision_timeout
+          loop do
+            record = sl_warden { env[:sl_machine].object_mask("mask[#{mask}]").getObject }
+            diff   = Integer(Time.now) - Integer(startTime)
+            break if diff > timeout || record.has_key?(data_type) && record[data_type].has_key?("primaryIpAddressRecord") && record[data_type]["primaryIpAddressRecord"].has_key?("ipAddress")
+            sleep(5)
+          end
           return {
             :address => record[data_type]["primaryIpAddressRecord"]["ipAddress"],
             :id      => record[data_type]["primaryIpAddressRecord"]["id"]
